@@ -15,7 +15,7 @@
   "type": "commonjs",
   "main": "server.js",
   "scripts": {
-    "start": "npm --prefix backend server.js",
+    "start": "npm server.js",
     "dev": "nodemon server.js"
   },
   "dependencies": {
