@@ -85,7 +85,7 @@ app.get("/api/tasks", async (req, res) => {
             const order = { high: 1, mid: 2, low: 3 };
             tasks.sort((a, b) => (order[a.priority] || 999) - (order[b.priority] || 999));
         }
-    
+
         else if (sort === "dueDate") {
             tasks = await Task.find({ deleted: false }).lean();
             tasks.sort((a, b) => {
@@ -94,11 +94,11 @@ app.get("/api/tasks", async (req, res) => {
                 return ta - tb;
             });
         }
-    
+
         else if (sort === "dateAdded") {
             tasks = await Task.find({ deleted: false }).sort({ createdAt: -1 }).lean();
         }
-        
+
         else {
             tasks = await Task.find({ deleted: false }).lean();
         }
