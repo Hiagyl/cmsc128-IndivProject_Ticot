@@ -78,23 +78,40 @@ app.use((err, req, res, next) => {
 app.get("/api/tasks", async (req, res) => {
     try {
         const { sort } = req.query;
-        let sortOption = {}
+        let tasks;
 
-        if (sort === "dateAdded") sortOption = { createdAt: -1 };
-        else if (sort === "dueDate") sortOption = { dueDate: 1 };
-        else if (sort === "priority") sortOption = {
-            priority: { $function: { body: 'function(p){return (p=="high"?1:(p=="mid"?2:3));}', args: ["$priority"], lang: "js" } }
-        };
+        // Priority sort: fetch then sort in-memory with a mapping
+        if (sort === "priority") {
+            tasks = await Task.find({ deleted: false }).lean();
+            const order = { high: 1, mid: 2, low: 3 };
+            tasks.sort((a, b) => (order[a.priority] || 999) - (order[b.priority] || 999));
+        }
+        // Due-date sort: fetch then sort in-memory, parse dates safely
+        else if (sort === "dueDate") {
+            tasks = await Task.find({ deleted: false }).lean();
+            tasks.sort((a, b) => {
+                const ta = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+                const tb = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+                return ta - tb;
+            });
+        }
+        // Date added: let Mongo/Mongoose sort by createdAt (requires timestamps:true in schema)
+        else if (sort === "dateAdded") {
+            tasks = await Task.find({ deleted: false }).sort({ createdAt: -1 }).lean();
+        }
+        // No sort or unknown sort: just return unsorted results
+        else {
+            tasks = await Task.find({ deleted: false }).lean();
+        }
 
-        const tasks = (await Task.find({ deleted: false })).sort(sortOption);
-        logger.info(`Retrieved ${tasks.length} tasks successfully`)
-        res.json(tasks);
+        logger.info(`Retrieved ${tasks.length} tasks successfully`);
+        return res.json(tasks);
     } catch (error) {
         logger.error("Error fetching tasks:", error);
-        res.status(500).json({ message: error.message });
-        // next(error);
+        return res.status(500).json({ message: error.message });
     }
 });
+
 
 app.post("/api/tasks", async (req, res) => {
     try {
@@ -113,11 +130,17 @@ app.post("/api/tasks", async (req, res) => {
 
 app.put("/api/tasks/:id", async (req, res) => {
     try {
-        const task = await Task.findByIdAndUpdate(req.params.id, { deleted: false, deletedAt: null }, { new: true });
+        const task = await Task.findByIdAndUpdate(
+            req.params.id,
+            { ...req.body, deleted: false, deletedAt: null }, // merge request body with flags
+            { new: true, runValidators: true } // return updated doc + validate schema
+        );
+
         if (!task) {
             logger.warn("Task not found for update:", { taskId: req.params.id });
             return res.status(404).json({ message: "Task not found" });
         }
+
         logger.info("Task updated successfully:", {
             taskId: task._id,
             title: task.title,
@@ -128,6 +151,7 @@ app.put("/api/tasks/:id", async (req, res) => {
         res.status(400).json({ message: error.message });
     }
 });
+
 
 app.delete("/api/tasks/:id", async (req, res) => {
     try {

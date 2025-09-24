@@ -1,11 +1,266 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>TODO LIST</title>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-    
+
+<body class="bg-gray-100 min-h-screen flex flex-col items-center p-6">
+    <h1 class="text-3xl font-bold mb-6">TODO LIST</h1>
+
+    <!-- Top bar -->
+    <div class="flex justify-between items-center w-full max-w-2xl mb-6">
+        <button id="openModalBtn" class="bg-blue-600 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-700">
+            + Add Task
+        </button>
+    </div>
+
+    <!-- Task list -->
+    <div id="taskList" class="w-full max-w-2xl space-y-3 mb-6 text-center text-gray-500">
+        Loading tasks...
+    </div>
+
+    <!-- Bottom Add Task Button -->
+    <div class="w-full max-w-2xl">
+        <button id="openModalBtn2" class="w-full bg-blue-600 text-white py-3 rounded-lg shadow hover:bg-blue-700">
+            + Add Task
+        </button>
+    </div>
+
+    <!-- Add Task Modal -->
+    <div id="taskModal" class="fixed inset-0 hidden bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white w-full max-w-md p-6 rounded-lg shadow-lg">
+            <h2 class="text-xl font-semibold mb-4">Add New Task</h2>
+            <form id="taskForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Task Title</label>
+                    <input type="text" id="taskTitle" class="w-full mt-1 p-2 border rounded-lg" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Due Date</label>
+                    <input type="date" id="taskDate" class="w-full mt-1 p-2 border rounded-lg" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Due Time</label>
+                    <input type="time" id="taskTime" class="w-full mt-1 p-2 border rounded-lg" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Priority</label>
+                    <select id="taskPriority" class="w-full mt-1 p-2 border rounded-lg" required>
+                        <option value="high">High</option>
+                        <option value="mid">Mid</option>
+                        <option value="low">Low</option>
+                    </select>
+                </div>
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button type="button" id="cancelModalBtn"
+                        class="px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400">Cancel</button>
+                    <button type="submit"
+                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Confirm</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Task Modal -->
+    <div id="editModal" class="fixed inset-0 hidden bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white w-full max-w-md p-6 rounded-lg shadow-lg">
+            <h2 class="text-xl font-semibold mb-4">Edit Task</h2>
+            <form id="editForm" class="space-y-4">
+                <input type="hidden" id="editId">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Task Title</label>
+                    <input type="text" id="editTitle" class="w-full mt-1 p-2 border rounded-lg" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Due Date</label>
+                    <input type="date" id="editDate" class="w-full mt-1 p-2 border rounded-lg" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Due Time</label>
+                    <input type="time" id="editTime" class="w-full mt-1 p-2 border rounded-lg" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Priority</label>
+                    <select id="editPriority" class="w-full mt-1 p-2 border rounded-lg" required>
+                        <option value="high">High</option>
+                        <option value="mid">Mid</option>
+                        <option value="low">Low</option>
+                    </select>
+                </div>
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button type="button" id="cancelEditBtn"
+                        class="px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400">Cancel</button>
+                    <button type="submit"
+                        class="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600">Update</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const modal = document.getElementById("taskModal");
+        const editModal = document.getElementById("editModal");
+        const openModalBtns = [document.getElementById("openModalBtn"), document.getElementById("openModalBtn2")];
+        const cancelModalBtn = document.getElementById("cancelModalBtn");
+        const cancelEditBtn = document.getElementById("cancelEditBtn");
+        const taskList = document.getElementById("taskList");
+
+        // Modal controls
+        openModalBtns.forEach(btn => btn.addEventListener("click", () => modal.classList.remove("hidden")));
+        cancelModalBtn.addEventListener("click", () => modal.classList.add("hidden"));
+        cancelEditBtn.addEventListener("click", () => editModal.classList.add("hidden"));
+
+        // Format date for display
+        function formatDate(dueDate) {
+            if (!dueDate) return "N/A";
+            const d = new Date(dueDate);
+            return d.toLocaleString(); // ✅ human readable
+        }
+
+        // Fetch tasks
+        async function loadTasks() {
+            taskList.innerHTML = "Loading tasks...";
+            try {
+                const res = await fetch("http://localhost:3000/api/tasks");
+                const tasks = await res.json();
+
+                if (!tasks.length) {
+                    taskList.innerHTML = `<p class="text-gray-500">You have no task yet</p>`;
+                    return;
+                }
+
+                taskList.innerHTML = "";
+                tasks.forEach(task => {
+                    const priorityColor =
+                        task.priority === "high" ? "bg-red-500" :
+                            task.priority === "mid" ? "bg-yellow-500" : "bg-green-500";
+
+                    const card = document.createElement("div");
+                    card.className = "bg-white shadow p-4 rounded-lg flex items-center";
+
+                    card.innerHTML = `
+          <div class="w-2 h-12 rounded-lg mr-3 ${priorityColor}"></div>
+          <div class="flex items-center space-x-3 flex-grow">
+            <input type="checkbox" class="w-5 h-5 text-blue-600 rounded" ${task.completed ? "checked" : ""}>
+            <div>
+              <h2 class="font-semibold text-lg">${task.title}</h2>
+              <p class="text-gray-500 text-sm">Due: ${formatDate(task.dueDate)}</p>
+            </div>
+          </div>
+          <div class="flex space-x-2">
+            <button class="editBtn text-yellow-500 hover:text-yellow-600" data-id="${task._id}">
+              ✏️
+            </button>
+            <button class="deleteBtn text-red-500 hover:text-red-600" data-id="${task._id}">
+              🗑️
+            </button>
+          </div>
+        `;
+                    taskList.appendChild(card);
+                });
+
+                // Add edit button listeners
+                document.querySelectorAll(".editBtn").forEach(btn => {
+                    btn.addEventListener("click", (e) => openEditModal(e.target.dataset.id, tasks));
+                });
+
+            } catch (err) {
+                taskList.innerHTML = `<p class="text-red-500">Error loading tasks</p>`;
+                console.error(err);
+            }
+        }
+
+        // Open edit modal with data
+        function openEditModal(id, tasks) {
+            const task = tasks.find(t => t._id === id);
+            if (!task) return;
+
+            document.getElementById("editId").value = task._id;
+            document.getElementById("editTitle").value = task.title;
+
+            if (task.dueDate) {
+                const d = new Date(task.dueDate);
+                document.getElementById("editDate").value = d.toISOString().split("T")[0];
+                document.getElementById("editTime").value = d.toISOString().split("T")[1].slice(0, 5);
+            }
+
+            document.getElementById("editPriority").value = task.priority;
+            editModal.classList.remove("hidden");
+        }
+
+        // Handle add task
+        document.getElementById("taskForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const dueDate = new Date(
+                document.getElementById("taskDate").value + "T" +
+                document.getElementById("taskTime").value
+            );
+
+            const newTask = {
+                title: document.getElementById("taskTitle").value,
+                dueDate,
+                priority: document.getElementById("taskPriority").value,
+                completed: false
+            };
+
+            try {
+                const res = await fetch("http://localhost:3000/api/tasks", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(newTask)
+                });
+
+                if (res.ok) {
+                    modal.classList.add("hidden");
+                    e.target.reset();
+                    loadTasks();
+                } else {
+                    alert("Error adding task");
+                }
+            } catch {
+                alert("Error connecting to server");
+            }
+        });
+
+        // Handle edit task
+        document.getElementById("editForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const id = document.getElementById("editId").value;
+            const dueDate = new Date(
+                document.getElementById("editDate").value + "T" +
+                document.getElementById("editTime").value
+            );
+
+            const updatedTask = {
+                title: document.getElementById("editTitle").value,
+                dueDate,
+                priority: document.getElementById("editPriority").value
+            };
+
+            try {
+                const res = await fetch(`http://localhost:3000/api/tasks/${id}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(updatedTask)
+                });
+
+                if (res.ok) {
+                    editModal.classList.add("hidden");
+                    loadTasks();
+                } else {
+                    alert("Error updating task");
+                }
+            } catch {
+                alert("Error connecting to server");
+            }
+        });
+
+        loadTasks();
+    </script>
 </body>
+
 </html>
