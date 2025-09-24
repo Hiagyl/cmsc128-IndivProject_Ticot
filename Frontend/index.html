@@ -101,6 +101,13 @@
         </div>
     </div>
 
+    <!-- Toast Notification -->
+    <div id="toast"
+        class="fixed bottom-4 right-4 hidden bg-gray-800 text-white px-4 py-2 rounded-lg shadow flex items-center space-x-3">
+        <span id="toastMessage">Task deleted</span>
+        <button id="undoBtn" class="bg-blue-500 px-2 py-1 rounded hover:bg-blue-600 text-sm">Undo</button>
+    </div>
+
     <script>
         const modal = document.getElementById("taskModal");
         const editModal = document.getElementById("editModal");
@@ -109,17 +116,50 @@
         const cancelEditBtn = document.getElementById("cancelEditBtn");
         const taskList = document.getElementById("taskList");
 
+        // Toast elements
+        const toast = document.getElementById("toast");
+        const toastMessage = document.getElementById("toastMessage");
+        const undoBtn = document.getElementById("undoBtn");
+        let lastDeletedTaskId = null;
+        let toastTimeout;
+
         // Modal controls
         openModalBtns.forEach(btn => btn.addEventListener("click", () => modal.classList.remove("hidden")));
         cancelModalBtn.addEventListener("click", () => modal.classList.add("hidden"));
         cancelEditBtn.addEventListener("click", () => editModal.classList.add("hidden"));
 
-        // Format date for display
+        // Format date
         function formatDate(dueDate) {
             if (!dueDate) return "N/A";
             const d = new Date(dueDate);
-            return d.toLocaleString(); // ✅ human readable
+            return d.toLocaleString();
         }
+
+        // Toast functions
+        function showToast(message, taskId) {
+            toastMessage.textContent = message;
+            toast.classList.remove("hidden");
+            lastDeletedTaskId = taskId;
+
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.add("hidden");
+                lastDeletedTaskId = null;
+            }, 5000);
+        }
+
+        // Undo restore
+        undoBtn.addEventListener("click", async () => {
+            if (!lastDeletedTaskId) return;
+            try {
+                await fetch(`http://localhost:3000/api/tasks/${lastDeletedTaskId}/restore`, { method: "POST" });
+                loadTasks();
+                toast.classList.add("hidden");
+                lastDeletedTaskId = null;
+            } catch (err) {
+                console.error("Error restoring task:", err);
+            }
+        });
 
         // Fetch tasks
         async function loadTasks() {
@@ -143,29 +183,60 @@
                     card.className = "bg-white shadow p-4 rounded-lg flex items-center";
 
                     card.innerHTML = `
-          <div class="w-2 h-12 rounded-lg mr-3 ${priorityColor}"></div>
-          <div class="flex items-center space-x-3 flex-grow">
-            <input type="checkbox" class="w-5 h-5 text-blue-600 rounded" ${task.completed ? "checked" : ""}>
-            <div>
-              <h2 class="font-semibold text-lg">${task.title}</h2>
-              <p class="text-gray-500 text-sm">Due: ${formatDate(task.dueDate)}</p>
+            <div class="w-2 h-12 rounded-lg mr-3 ${priorityColor}"></div>
+            <div class="flex items-center space-x-3 flex-grow">
+              <input type="checkbox" class="taskCheckbox w-5 h-5 text-blue-600 rounded" data-id="${task._id}" ${task.completed ? "checked" : ""}>
+              <div>
+                <h2 class="font-semibold text-lg ${task.completed ? "line-through text-gray-400" : ""}">${task.title}</h2>
+                <p class="text-gray-500 text-sm">Due: ${formatDate(task.dueDate)}</p>
+              </div>
             </div>
-          </div>
-          <div class="flex space-x-2">
-            <button class="editBtn text-yellow-500 hover:text-yellow-600" data-id="${task._id}">
-              ✏️
-            </button>
-            <button class="deleteBtn text-red-500 hover:text-red-600" data-id="${task._id}">
-              🗑️
-            </button>
-          </div>
-        `;
+            <div class="flex space-x-2">
+              <button class="editBtn text-yellow-500 hover:text-yellow-600" data-id="${task._id}">✏️</button>
+              <button class="deleteBtn text-red-500 hover:text-red-600" data-id="${task._id}">🗑️</button>
+            </div>
+          `;
                     taskList.appendChild(card);
                 });
 
-                // Add edit button listeners
+                // Checkbox toggle (complete/incomplete)
+                document.querySelectorAll(".taskCheckbox").forEach(checkbox => {
+                    checkbox.addEventListener("change", async (e) => {
+                        const id = e.target.dataset.id;
+                        const completed = e.target.checked;
+
+                        try {
+                            await fetch(`http://localhost:3000/api/tasks/${id}`, {
+                                method: "PUT",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ completed })
+                            });
+                            loadTasks();
+                        } catch (err) {
+                            console.error("Error updating completion:", err);
+                        }
+                    });
+                });
+
+                // Edit button
                 document.querySelectorAll(".editBtn").forEach(btn => {
                     btn.addEventListener("click", (e) => openEditModal(e.target.dataset.id, tasks));
+                });
+
+                // Delete button
+                document.querySelectorAll(".deleteBtn").forEach(btn => {
+                    btn.addEventListener("click", async (e) => {
+                        const id = e.target.dataset.id;
+                        try {
+                            const res = await fetch(`http://localhost:3000/api/tasks/${id}`, { method: "DELETE" });
+                            if (res.ok) {
+                                showToast("Task deleted", id);
+                                loadTasks();
+                            }
+                        } catch (err) {
+                            console.error("Error deleting task:", err);
+                        }
+                    });
                 });
 
             } catch (err) {
@@ -174,7 +245,7 @@
             }
         }
 
-        // Open edit modal with data
+        // Open edit modal
         function openEditModal(id, tasks) {
             const task = tasks.find(t => t._id === id);
             if (!task) return;
@@ -192,7 +263,7 @@
             editModal.classList.remove("hidden");
         }
 
-        // Handle add task
+        // Add task
         document.getElementById("taskForm").addEventListener("submit", async (e) => {
             e.preventDefault();
             const dueDate = new Date(
@@ -226,7 +297,7 @@
             }
         });
 
-        // Handle edit task
+        // Edit task
         document.getElementById("editForm").addEventListener("submit", async (e) => {
             e.preventDefault();
             const id = document.getElementById("editId").value;
@@ -259,6 +330,7 @@
             }
         });
 
+        // Initial load
         loadTasks();
     </script>
 </body>
