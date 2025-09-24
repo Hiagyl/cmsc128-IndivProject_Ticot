@@ -80,13 +80,12 @@ app.get("/api/tasks", async (req, res) => {
         const { sort } = req.query;
         let tasks;
 
-        // Priority sort: fetch then sort in-memory with a mapping
         if (sort === "priority") {
             tasks = await Task.find({ deleted: false }).lean();
             const order = { high: 1, mid: 2, low: 3 };
             tasks.sort((a, b) => (order[a.priority] || 999) - (order[b.priority] || 999));
         }
-        // Due-date sort: fetch then sort in-memory, parse dates safely
+    
         else if (sort === "dueDate") {
             tasks = await Task.find({ deleted: false }).lean();
             tasks.sort((a, b) => {
@@ -95,11 +94,11 @@ app.get("/api/tasks", async (req, res) => {
                 return ta - tb;
             });
         }
-        // Date added: let Mongo/Mongoose sort by createdAt (requires timestamps:true in schema)
+    
         else if (sort === "dateAdded") {
             tasks = await Task.find({ deleted: false }).sort({ createdAt: -1 }).lean();
         }
-        // No sort or unknown sort: just return unsorted results
+        
         else {
             tasks = await Task.find({ deleted: false }).lean();
         }
