@@ -168,17 +168,29 @@ app.get("/api/tasks", authenticateToken, async (req, res) => {
 // CREATE TASK (linked to logged-in user)
 app.post("/api/tasks", authenticateToken, async (req, res) => {
     try {
+        const { title, dueDate, priority, completed } = req.body;
+
+        if (!title) return res.status(400).json({ message: "Title is required" });
+
         const task = new Task({
-            ...req.body,
-            user: req.user.id
+            title,
+            dueDate: dueDate ? new Date(dueDate) : null, // ensure Date
+            priority: ["high", "mid", "low"].includes(priority) ? priority : "mid",
+            completed: completed ?? false,
+            deleted: false,
+            userId: req.user.id
         });
 
         const saved = await task.save();
         res.status(201).json(saved);
     } catch (err) {
-        res.status(400).json({ message: "Could not create task." });
+        console.error("Validation error:", err);
+        res.status(400).json({ message: "Could not create task", error: err.message });
     }
 });
+
+
+
 
 // UPDATE USER'S TASK
 app.put("/api/tasks/:id", authenticateToken, async (req, res) => {
