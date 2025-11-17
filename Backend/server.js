@@ -147,97 +147,151 @@ app.put("/api/update", authenticateToken, async (req, res) => {
 
 // GET ALL TASKS
 app.get("/api/tasks", authenticateToken, async (req, res) => {
-  try {
-    const { sort } = req.query;
+    try {
+        const { sort, mode } = req.query;
 
-    let tasks = await Task.find({ userId: req.user.id, deleted: false }).lean();
+        let query;
 
-    if (sort === "priority") {
-      const order = { high: 1, mid: 2, low: 3 };
-      tasks.sort((a, b) => order[a.priority] - order[b.priority]);
+        if (mode === "personal") {
+            query = { deleted: false, ownerId: req.user.id, mode: "personal" };
+        } else if (mode === "collaborative") {
+            query = {
+                deleted: false,
+                mode: "collaborative",
+                $or: [
+                    { ownerId: req.user.id },
+                    { collaborators: req.user.id }
+                ]
+            };
+        } else {
+            // If no mode specified, return BOTH personal and collaborative
+            query = {
+                deleted: false,
+                $or: [
+                    { ownerId: req.user.id }, // personal + collaborative owned
+                    { collaborators: req.user.id } // collaborative only
+                ]
+            };
+        }
+
+        let tasks = await Task.find(query).lean();
+
+        // Sorting
+        if (sort === "priority") {
+            const order = { high: 1, mid: 2, low: 3 };
+            tasks.sort((a, b) => order[a.priority] - order[b.priority]);
+        } else if (sort === "dueDate") {
+            tasks.sort((a, b) => (a.dueDate ? new Date(a.dueDate) : Infinity) - (b.dueDate ? new Date(b.dueDate) : Infinity));
+        } else if (sort === "dateAdded") {
+            tasks.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        }
+
+        res.json(tasks);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Could not fetch tasks." });
     }
-
-    if (sort === "dueDate") {
-      tasks.sort((a, b) => (a.dueDate ? new Date(a.dueDate) : Infinity) - (b.dueDate ? new Date(b.dueDate) : Infinity));
-    }
-
-    if (sort === "dateAdded") {
-      tasks.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    }
-
-    res.json(tasks);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Could not fetch tasks." });
-  }
 });
+
+
 
 // CREATE TASK
 app.post("/api/tasks", authenticateToken, async (req, res) => {
-  try {
-    const { title, dueDate, priority, completed } = req.body;
+    try {
+        const { title, dueDate, priority, completed, mode, collaborators } = req.body;
 
-    if (!title) return res.status(400).json({ message: "Title is required" });
+        if (!title) return res.status(400).json({ message: "Title is required" });
 
-    const task = new Task({
-      title,
-      dueDate: dueDate ? new Date(dueDate) : null,
-      priority: ["high", "mid", "low"].includes(priority) ? priority : "mid",
-      completed: completed ?? false,
-      deleted: false,
-      userId: req.user.id,
-    });
+        const task = new Task({
+            title,
+            dueDate: dueDate ? new Date(dueDate) : null,
+            priority: ["high", "mid", "low"].includes(priority) ? priority : "mid",
+            completed: completed ?? false,
+            deleted: false,
+            mode: mode === "collaborative" ? "collaborative" : "personal",
+            ownerId: req.user.id,
+            collaborators: mode === "collaborative" ? collaborators || [] : []
+        });
 
-    const saved = await task.save();
-    res.status(201).json(saved);
-  } catch (err) {
-    console.error("Validation error:", err);
-    res.status(400).json({ message: "Could not create task", error: err.message });
-  }
+        const saved = await task.save();
+        res.status(201).json(saved);
+    } catch (err) {
+        console.error(err);
+        res.status(400).json({ message: "Could not create task", error: err.message });
+    }
 });
+
 
 // UPDATE TASK
 app.put("/api/tasks/:id", authenticateToken, async (req, res) => {
-  try {
-    const updated = await Task.findOneAndUpdate(
-      { _id: req.params.id, userId: req.user.id },
-      { ...req.body, updatedAt: new Date() },
-      { new: true }
-    );
+    try {
+        const task = await Task.findOne({
+            _id: req.params.id,
+            $or: [
+                { ownerId: req.user.id },
+                { collaborators: req.user.id }
+            ]
+        });
 
-    if (!updated) return res.status(404).json({ message: "Task not found." });
-    res.json(updated);
-  } catch (err) {
-    console.error(err);
-    res.status(400).json({ message: "Update failed." });
-  }
+        if (!task) return res.status(404).json({ message: "Task not found or no permission" });
+
+        // Only owner can modify collaborators or mode
+        if (task.ownerId.toString() !== req.user.id) {
+            delete req.body.collaborators;
+            delete req.body.mode;
+        }
+
+        Object.assign(task, { ...req.body, updatedAt: new Date() });
+        await task.save();
+
+        res.json(task);
+    } catch (err) {
+        console.error(err);
+        res.status(400).json({ message: "Update failed." });
+    }
 });
+
 
 // DELETE TASK (soft delete)
 app.delete("/api/tasks/:id", authenticateToken, async (req, res) => {
-  try {
-    const deleted = await Task.findOneAndUpdate(
-      { _id: req.params.id, userId: req.user.id },
-      { deleted: true, deletedAt: new Date() },
-      { new: true }
-    );
+    try {
+        const task = await Task.findOne({
+            _id: req.params.id,
+            $or: [
+                { ownerId: req.user.id },
+                { collaborators: req.user.id }
+            ]
+        });
 
-    if (!deleted) return res.status(404).json({ message: "Task not found." });
-    res.json({ message: "Task deleted." });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Delete failed." });
-  }
+        if (!task) return res.status(404).json({ message: "Task not found or no permission" });
+
+        task.deleted = true;
+        task.deletedAt = new Date();
+        await task.save();
+
+        res.json({ message: "Task deleted." });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Delete failed." });
+    }
 });
+
 
 // RESTORE TASK
 app.post("/api/tasks/:id/restore", authenticateToken, async (req, res) => {
   try {
-    const restored = await Task.findOneAndUpdate(
-      { _id: req.params.id, userId: req.user.id },
-      { deleted: false, deletedAt: null },
-      { new: true }
-    );
+      const restored = await Task.findOneAndUpdate(
+          {
+              _id: req.params.id,
+              $or: [
+                  { ownerId: req.user.id },
+                  { collaborators: req.user.id }
+              ]
+          },
+          { deleted: false, deletedAt: null },
+          { new: true }
+      );
+
 
     if (!restored) return res.status(404).json({ message: "Task not found." });
     res.json({ message: "Task restored.", task: restored });
@@ -249,20 +303,73 @@ app.post("/api/tasks/:id/restore", authenticateToken, async (req, res) => {
 
 // COMPLETE TASK
 app.patch("/api/tasks/:id/complete", authenticateToken, async (req, res) => {
-  try {
-    const completed = await Task.findOneAndUpdate(
-      { _id: req.params.id, userId: req.user.id },
-      { completed: true, updatedAt: new Date() },
-      { new: true }
-    );
+    try {
+        const completed = await Task.findOneAndUpdate(
+            {
+                _id: req.params.id,
+                $or: [
+                    { ownerId: req.user.id },
+                    { collaborators: req.user.id }
+                ]
+            },
+            { completed: true, updatedAt: new Date() },
+            { new: true }
+        );
 
-    if (!completed) return res.status(404).json({ message: "Task not found." });
-    res.json({ message: "Task completed.", task: completed });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Complete failed." });
-  }
+        if (!completed) return res.status(404).json({ message: "Task not found or no permission." });
+        res.json({ message: "Task completed.", task: completed });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Complete failed." });
+    }
 });
+
+//GET USER BY EMAIL
+// GET USER BY EMAIL
+app.get("/api/users/email/:email", authenticateToken, async (req, res) => {
+    try {
+        const { email } = req.params;
+
+        if (!email) return res.status(400).json({ message: "Email is required" });
+
+        const user = await User.findOne({ email }).select("_id name email");
+        if (!user) return res.status(404).json({ message: "User not found" });
+
+        res.json(user);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server error" });
+    }
+});
+
+
+// ADD COLLABORATORS
+// ADD COLLABORATORS BY EMAIL
+app.post("/api/tasks/:id/add-collaborator", authenticateToken, async (req, res) => {
+    try {
+        const { email } = req.body; // accept email instead of _id
+        if (!email) return res.status(400).json({ message: "Collaborator email is required" });
+
+        // Find the user by email
+        const user = await User.findOne({ email });
+        if (!user) return res.status(404).json({ message: "User not found" });
+
+        const task = await Task.findOne({ _id: req.params.id, ownerId: req.user.id });
+        if (!task) return res.status(404).json({ message: "Task not found or you are not the owner" });
+
+        // Check if already a collaborator
+        if (!task.collaborators.includes(user._id)) {
+            task.collaborators.push(user._id);
+            await task.save();
+        }
+
+        res.json({ message: "Collaborator added", task });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Could not add collaborator" });
+    }
+});
+
 
 // ---------------------- ERROR HANDLER ----------------------
 app.use((err, req, res, next) => {

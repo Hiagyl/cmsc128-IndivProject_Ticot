@@ -2,10 +2,10 @@
 const mongoose = require("mongoose");
 
 const taskSchema = new mongoose.Schema({
-    userId: {
+    ownerId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
-        required: true   // ensures every task belongs to a user
+        required: true   // task must have an owner
     },
 
     title: { type: String, required: true },
@@ -15,6 +15,13 @@ const taskSchema = new mongoose.Schema({
 
     dueDateString: { type: String },
     dueDate: { type: Date },
+
+    mode: { type: String, enum: ["personal", "collaborative"], default: "personal" },
+
+    collaborators: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User"
+    }],
 
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
