@@ -4,7 +4,6 @@ const cors = require("cors");
 require("dotenv").config();
 const morgan = require("morgan");
 const winston = require("winston");
-const argon2 = require("argon2");
 const jwt = require("jsonwebtoken");
 
 const Task = require("./models/Task");
@@ -12,18 +11,18 @@ const User = require("./models/User");
 
 const app = express();
 
-// ----- Middleware -----
+// ---------------------- Middleware ----------------------
 app.use(cors());
 app.use(express.json());
 app.use(express.static("public"));
 
-// ----- MongoDB -----
+// ---------------------- MongoDB ----------------------
 mongoose
     .connect(process.env.MONGODB_URI || "mongodb://localhost:27017/tasks")
     .then(() => console.log("Connected to MongoDB"))
-    .catch((err) => console.error("MongoDB connection error:", err));
+    .catch(err => console.error("MongoDB connection error:", err));
 
-// ----- Logger -----
+// ---------------------- Logger ----------------------
 const logger = winston.createLogger({
     level: "info",
     format: winston.format.combine(
@@ -44,43 +43,29 @@ const logger = winston.createLogger({
 
 app.use(morgan(":method :url :status :response-time ms - :res[content-length]"));
 
-const apiLogger = (req, res, next) => {
+app.use((req, res, next) => {
     const start = Date.now();
     res.on("finish", () => {
-        const duration = Date.now() - start;
         logger.info({
             method: req.method,
             path: req.path,
             status: res.statusCode,
-            duration: `${duration}ms`,
+            duration: `${Date.now() - start}ms`,
             params: req.params,
             query: req.query,
             body: req.method !== "GET" ? req.body : undefined,
         });
     });
     next();
-};
-app.use(apiLogger);
-
-app.use((err, req, res, next) => {
-    logger.error({
-        message: err.message,
-        stack: err.stack,
-        method: req.method,
-        path: req.path,
-        params: req.params,
-        query: req.query,
-        body: req.method !== "GET" ? req.body : undefined,
-    });
-    res.status(500).json({ message: "Internal server error" });
 });
 
-// ----- AUTH HELPERS -----
+// ---------------------- Auth Middleware ----------------------
 const authenticateToken = (req, res, next) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) return res.status(401).json({ message: "No token provided" });
+    const auth = req.headers.authorization;
+    if (!auth) return res.status(401).json({ message: "No token provided" });
 
-    const token = authHeader.split(" ")[1];
+    const token = auth.split(" ")[1];
+
     jwt.verify(token, "secretkey", (err, user) => {
         if (err) return res.status(403).json({ message: "Invalid token" });
         req.user = user;
@@ -88,26 +73,20 @@ const authenticateToken = (req, res, next) => {
     });
 };
 
-// ----- AUTH ROUTES -----
+// ---------------------- AUTH ROUTES ----------------------
 app.post("/api/signup", async (req, res) => {
     try {
         const { name, email, password } = req.body;
 
-        if (!name || !email || !password)
-            return res.status(400).json({ message: "All fields are required." });
+        const exists = await User.findOne({ email });
+        if (exists) return res.status(400).json({ message: "Email already registered." });
 
-        const existingUser = await User.findOne({ email });
-        if (existingUser)
-            return res.status(400).json({ message: "Email already registered." });
-
-        const newUser = new User({ name, email, password }); 
+        const newUser = new User({ name, email, password });
         await newUser.save();
 
-        logger.info(`User registered: ${email}`);
         res.status(201).json({ message: "User registered successfully." });
-    } catch (error) {
-        logger.error("Error during signup:", error);
-        res.status(500).json({ message: "Server error." });
+    } catch (err) {
+        res.status(500).json({ message: "Signup failed." });
     }
 });
 
@@ -115,28 +94,25 @@ app.post("/api/login", async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        if (!email || !password)
-            return res.status(400).json({ message: "Email and password required." });
-
         const user = await User.findOne({ email });
-        if (!user)
-            return res.status(401).json({ message: "Invalid email or password." });
+        if (!user) return res.status(401).json({ message: "Invalid email or password." });
 
         const isMatch = await user.comparePassword(password);
-        if (!isMatch)
-            return res.status(401).json({ message: "Invalid email or password." });
+        if (!isMatch) return res.status(401).json({ message: "Invalid email or password." });
 
-        const token = jwt.sign({ id: user._id, email: user.email }, "secretkey", { expiresIn: "1h" });
+        const token = jwt.sign(
+            { id: user._id, email: user.email },
+            "secretkey",
+            { expiresIn: "1h" }
+        );
 
-        logger.info(`User logged in: ${email}`);
-        res.status(200).json({
-            message: "Login successful.",
+        res.json({
+            message: "Login successful",
             token,
-            user: { id: user._id, name: user.name, email: user.email },
+            user: { id: user._id, name: user.name, email: user.email }
         });
-    } catch (error) {
-        logger.error("Error during login:", error);
-        res.status(500).json({ message: "Server error." });
+    } catch (err) {
+        res.status(500).json({ message: "Login error." });
     }
 });
 
@@ -145,125 +121,139 @@ app.put("/api/update", authenticateToken, async (req, res) => {
         const { name, email, password } = req.body;
 
         const user = await User.findById(req.user.id);
-        if (!user) return res.status(404).json({ message: "User not found" });
 
         if (name) user.name = name;
         if (email) user.email = email;
-        if (password && password.trim() !== "") {
-            user.password = password; // hashed by pre-save hook
-        }
+        if (password && password.trim() !== "") user.password = password;
 
         await user.save();
 
-        res.status(200).json({
-            message: "Profile updated successfully",
-            user: { id: user._id, name: user.name, email: user.email },
-        });
-    } catch (error) {
-        console.error("Error updating profile:", error);
-        res.status(500).json({ message: "Internal server error" });
+        res.json({ message: "Profile updated.", user });
+    } catch (err) {
+        res.status(500).json({ message: "Update failed." });
     }
 });
 
-// ----- TASK ROUTES -----
-app.get("/api/tasks", async (req, res) => {
+// ---------------------- TASK ROUTES ----------------------
+
+// GET ALL TASKS for logged-in user
+app.get("/api/tasks", authenticateToken, async (req, res) => {
     try {
         const { sort } = req.query;
-        let tasks;
+
+        let tasks = await Task.find({ user: req.user.id, deleted: false }).lean();
 
         if (sort === "priority") {
-            tasks = await Task.find({ deleted: false }).lean();
             const order = { high: 1, mid: 2, low: 3 };
-            tasks.sort((a, b) => (order[a.priority] || 999) - (order[b.priority] || 999));
-        } else if (sort === "dueDate") {
-            tasks = await Task.find({ deleted: false }).lean();
-            tasks.sort((a, b) => (a.dueDate ? new Date(a.dueDate) : Infinity) - (b.dueDate ? new Date(b.dueDate) : Infinity));
-        } else if (sort === "dateAdded") {
-            tasks = await Task.find({ deleted: false }).sort({ createdAt: -1 }).lean();
-        } else {
-            tasks = await Task.find({ deleted: false }).lean();
+            tasks.sort((a, b) => order[a.priority] - order[b.priority]);
         }
 
-        logger.info(`Retrieved ${tasks.length} tasks successfully`);
+        if (sort === "dueDate") {
+            tasks.sort((a, b) =>
+                (a.dueDate ? new Date(a.dueDate) : Infinity) -
+                (b.dueDate ? new Date(b.dueDate) : Infinity)
+            );
+        }
+
+        if (sort === "dateAdded") {
+            tasks.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        }
+
         res.json(tasks);
-    } catch (error) {
-        logger.error("Error fetching tasks:", error);
-        res.status(500).json({ message: error.message });
+    } catch (err) {
+        res.status(500).json({ message: "Could not fetch tasks." });
     }
 });
 
-app.post("/api/tasks", async (req, res) => {
+// CREATE TASK (linked to logged-in user)
+app.post("/api/tasks", authenticateToken, async (req, res) => {
     try {
-        const task = new Task(req.body);
-        const savedTask = await task.save();
-        logger.info("New task created:", { taskId: savedTask._id, title: savedTask.title });
-        res.status(201).json(savedTask);
-    } catch (error) {
-        logger.error("Error creating task:", error);
-        res.status(400).json({ message: error.message });
+        const task = new Task({
+            ...req.body,
+            user: req.user.id
+        });
+
+        const saved = await task.save();
+        res.status(201).json(saved);
+    } catch (err) {
+        res.status(400).json({ message: "Could not create task." });
     }
 });
 
-app.put("/api/tasks/:id", async (req, res) => {
+// UPDATE USER'S TASK
+app.put("/api/tasks/:id", authenticateToken, async (req, res) => {
     try {
-        const task = await Task.findByIdAndUpdate(
-            req.params.id,
-            { ...req.body, deleted: false, deletedAt: null },
-            { new: true, runValidators: true }
+        const updated = await Task.findOneAndUpdate(
+            { _id: req.params.id, user: req.user.id },
+            { ...req.body, updatedAt: new Date() },
+            { new: true }
         );
-        if (!task) return res.status(404).json({ message: "Task not found" });
 
-        logger.info("Task updated successfully:", { taskId: task._id, title: task.title });
-        res.json(task);
-    } catch (error) {
-        logger.error("Error updating task:", error);
-        res.status(400).json({ message: error.message });
+        if (!updated) return res.status(404).json({ message: "Task not found." });
+
+        res.json(updated);
+    } catch (err) {
+        res.status(400).json({ message: "Update failed." });
     }
 });
 
-app.delete("/api/tasks/:id", async (req, res) => {
+// DELETE (soft delete)
+app.delete("/api/tasks/:id", authenticateToken, async (req, res) => {
     try {
-        const task = await Task.findByIdAndUpdate(req.params.id, { deleted: true, deletedAt: new Date() }, { new: true });
-        if (!task) return res.status(404).json({ message: "Task not found" });
+        const deleted = await Task.findOneAndUpdate(
+            { _id: req.params.id, user: req.user.id },
+            { deleted: true, deletedAt: new Date() },
+            { new: true }
+        );
 
-        logger.info("Task deleted successfully", { taskId: task._id, title: task.title });
-        res.json({ message: "Task deleted successfully" });
-    } catch (error) {
-        logger.error("Error deleting task:", error);
-        res.status(500).json({ message: error.message });
+        if (!deleted) return res.status(404).json({ message: "Task not found." });
+
+        res.json({ message: "Task deleted." });
+    } catch (err) {
+        res.status(500).json({ message: "Delete failed." });
     }
 });
 
-app.post("/api/tasks/:id/restore", async (req, res) => {
+// RESTORE
+app.post("/api/tasks/:id/restore", authenticateToken, async (req, res) => {
     try {
-        const task = await Task.findByIdAndUpdate(
-            req.params.id,
+        const restored = await Task.findOneAndUpdate(
+            { _id: req.params.id, user: req.user.id },
             { deleted: false, deletedAt: null },
             { new: true }
         );
-        if (!task) return res.status(404).json({ message: "Task not found" });
 
-        logger.info("Task restored successfully", { taskId: task._id, title: task.title });
-        res.json({ message: "Task restored successfully", task });
-    } catch (error) {
-        logger.error("Error restoring task:", error);
-        res.status(500).json({ message: error.message });
+        if (!restored) return res.status(404).json({ message: "Task not found." });
+
+        res.json({ message: "Task restored.", task: restored });
+    } catch (err) {
+        res.status(500).json({ message: "Restore failed." });
     }
 });
 
-app.patch("/api/tasks/:id/complete", async (req, res) => {
+// COMPLETE
+app.patch("/api/tasks/:id/complete", authenticateToken, async (req, res) => {
     try {
-        const task = await Task.findByIdAndUpdate(req.params.id, { completed: true }, { new: true });
-        if (!task) return res.status(404).json({ message: "Task not found" });
+        const completed = await Task.findOneAndUpdate(
+            { _id: req.params.id, user: req.user.id },
+            { completed: true },
+            { new: true }
+        );
 
-        logger.info("Task marked as completed", { taskId: task._id, title: task.title });
-        res.json({ message: "Task marked as completed", task });
-    } catch (error) {
-        logger.error("Error marking task as completed:", error);
-        res.status(500).json({ message: error.message });
+        if (!completed) return res.status(404).json({ message: "Task not found." });
+
+        res.json({ message: "Task completed.", task: completed });
+    } catch (err) {
+        res.status(500).json({ message: "Complete failed." });
     }
 });
 
-// ----- Server -----
+// ---------------------- ERROR HANDLER (Must be last) ----------------------
+app.use((err, req, res, next) => {
+    logger.error(err);
+    res.status(500).json({ message: "Internal server error" });
+});
+
+// ---------------------- Server ----------------------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
