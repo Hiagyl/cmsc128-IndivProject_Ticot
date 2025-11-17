@@ -130,6 +130,9 @@
     </div>
 
     <script>
+        const user = JSON.parse(localStorage.getItem("user"));
+        const token = localStorage.getItem("token");
+
         const modal = document.getElementById("taskModal");
         const editModal = document.getElementById("editModal");
         const openModalBtns = [document.getElementById("openModalBtn"), document.getElementById("openModalBtn2")];
@@ -187,14 +190,33 @@
         }
 
         undoBtn.addEventListener("click", async () => {
-            if (!lastDeletedTaskId) return;
-            try {
-                await fetch(`http://localhost:3000/api/tasks/${lastDeletedTaskId}/restore`, { method: "POST" });
-                await loadTasks();
-                toast.classList.add("hidden");
-                lastDeletedTaskId = null;
-            } catch (err) { console.error(err); }
-        });
+                if (!lastDeletedTaskId) return;
+                try {
+                    const res = await fetch(`http://localhost:3000/api/tasks/${lastDeletedTaskId}/restore`, {
+                        method: "POST",
+                        headers: {
+                            "Authorization": `Bearer ${token}` // <-- include token
+                        }
+                    });
+
+                    if (res.ok) {
+                        await loadTasks();
+                        toast.classList.add("hidden");
+                        lastDeletedTaskId = null;
+                    } else if (res.status === 401) {
+                        alert("Unauthorized. Please log in again.");
+                        localStorage.clear();
+                        window.location.href = "index.html";
+                    } else {
+                        const data = await res.json();
+                        alert("Error restoring task: " + (data.message || res.statusText));
+                    }
+                } catch (err) {
+                    console.error(err);
+                    alert("Error connecting to server");
+                }
+            });
+
 
         // Event delegation for task actions
         taskList.addEventListener("click", async (e) => {
@@ -225,12 +247,23 @@
             if (deleteBtn) {
                 const id = deleteBtn.dataset.id;
                 try {
-                    const res = await fetch(`http://localhost:3000/api/tasks/${id}`, { method: "DELETE" });
+                    const res = await fetch(`http://localhost:3000/api/tasks/${id}`, {
+                        method: "DELETE",
+                        headers: {
+                            "Authorization": `Bearer ${token}` // <-- include token here
+                        }
+                    });
                     if (res.ok) {
                         showToast("Task deleted", id);
                         deleteBtn.closest("div.bg-white").remove();
+                    } else if (res.status === 401) {
+                        alert("Unauthorized. Please log in again.");
+                        localStorage.clear();
+                        window.location.href = "index.html";
                     }
-                } catch (err) { console.error(err); }
+                } catch (err) {
+                    console.error(err);
+                }
             }
         });
 
@@ -250,29 +283,57 @@
 
         // Add task
         document.getElementById("taskForm").addEventListener("submit", async (e) => {
-            e.preventDefault();
-            const dueDate = new Date(document.getElementById("taskDate").value + "T" + document.getElementById("taskTime").value);
-            const newTask = {
-                title: document.getElementById("taskTitle").value,
-                dueDate,
-                priority: document.getElementById("taskPriority").value,
-                completed: false
-            };
-            try {
-                const res = await fetch("http://localhost:3000/api/tasks", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(newTask)
-                });
-                if (res.ok) {
-                    modal.classList.add("hidden");
-                    e.target.reset();
-                    await loadTasks();
-                } else alert("Error adding task");
-            } catch {
-                alert("Error connecting to server");
-            }
-        });
+                e.preventDefault();
+
+                // Construct due date
+                const dueDate = new Date(
+                    document.getElementById("taskDate").value + "T" +
+                    document.getElementById("taskTime").value
+                );
+
+                // Prepare task object
+                const newTask = {
+                    title: document.getElementById("taskTitle").value,
+                    dueDate: dueDate.toISOString(), // send ISO string
+                    priority: document.getElementById("taskPriority").value,
+                    completed: false
+                };
+
+                try {
+                    // Get token from localStorage
+                    const token = localStorage.getItem("token");
+                    if (!token) {
+                        alert("You must log in first.");
+                        window.location.href = "index.html";
+                        return;
+                    }
+
+                    // Send POST request with token
+                    const res = await fetch("http://localhost:3000/api/tasks", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Authorization": `Bearer ${token}`
+                        },
+                        body: JSON.stringify(newTask)
+                    });
+
+                    const data = await res.json(); // parse response
+
+                    if (res.ok) {
+                        modal.classList.add("hidden");
+                        e.target.reset();
+                        await loadTasks(); // refresh tasks
+                    } else {
+                        alert("Error adding task: " + (data.message || res.statusText));
+                    }
+                } catch (err) {
+                    console.error(err);
+                    alert("Error connecting to server");
+                }
+            });
+
+
 
         // Edit task
         document.getElementById("editForm").addEventListener("submit", async (e) => {
@@ -287,7 +348,9 @@
             try {
                 const res = await fetch(`http://localhost:3000/api/tasks/${id}`, {
                     method: "PUT",
-                    headers: { "Content-Type": "application/json" },
+                    headers: { "Content-Type": "application/json",
+                        "Authorization": `Bearer ${token}`
+                     },
                     body: JSON.stringify(updatedTask)
                 });
                 if (res.ok) {
@@ -301,46 +364,68 @@
 
         // Load tasks
         async function loadTasks() {
-            taskList.innerHTML = "Loading tasks...";
-            try {
-                let url = "http://localhost:3000/api/tasks";
-                if (currentSort) url += `?sort=${currentSort}`;
-                const res = await fetch(url);
-                const tasks = await res.json();
-                tasksCache = tasks;
-                if (!tasks.length) {
-                    taskList.innerHTML = `<p class="text-gray-500">You have no task yet. Add new tasks?</p>`;
-                    return;
+                taskList.innerHTML = "Loading tasks...";
+                try {
+                    // Construct the URL with sorting if needed
+                    let url = "http://localhost:3000/api/tasks";
+                    if (currentSort) url += `?sort=${currentSort}`;
+
+                    // Fetch tasks with Authorization header
+                    const res = await fetch(url, {
+                        headers: {
+                            "Authorization": `Bearer ${token}`
+                        }
+                    });
+
+                    // Handle unauthorized / expired token
+                    if (res.status === 401) {
+                        alert("Session expired. Please log in again.");
+                        localStorage.clear();
+                        window.location.href = "index.html";
+                        return;
+                    }
+
+                    const tasks = await res.json();
+                    tasksCache = tasks;
+
+                    if (!tasks.length) {
+                        taskList.innerHTML = `<p class="text-gray-500">You have no task yet. Add new tasks?</p>`;
+                        return;
+                    }
+
+                    // Clear the task list
+                    taskList.innerHTML = "";
+
+                    tasks.forEach(task => {
+                        const priorityColor = task.priority === "high" ? "bg-red-500" :
+                            task.priority === "mid" ? "bg-yellow-500" : "bg-green-500";
+
+                        const card = document.createElement("div");
+                        card.className = "bg-white shadow p-4 rounded-lg flex items-center";
+                        card.innerHTML = `
+                <div class="w-2 h-12 rounded-lg mr-3 ${priorityColor}"></div>
+                <div class="flex items-center space-x-3 flex-grow">
+                    <input type="checkbox" class="taskCheckbox w-5 h-5 text-blue-600 rounded" data-id="${task._id}" ${task.completed ? "checked" : ""}>
+                    <div>
+                        <h2 class="font-semibold text-lg ${task.completed ? "line-through text-gray-400" : ""}">${task.title}</h2>
+                        <p class="text-gray-500 text-sm">Due: ${formatDate(task.dueDate)}</p>
+                        <p class="text-gray-500 text-sm">Created: ${formatDate(task.createdAt)}</p>
+                    </div>
+                </div>
+                <div class="flex space-x-2">
+                    <button class="editBtn text-yellow-500 hover:text-yellow-600" data-id="${task._id}" title="Edit Task">Edit</button>
+                    <button class="deleteBtn text-red-500 hover:text-red-600" data-id="${task._id}" title="Delete Task">Delete</button>
+                </div>
+            `;
+                        taskList.appendChild(card);
+                    });
+
+                } catch (err) {
+                    taskList.innerHTML = `<p class="text-red-500">Error loading tasks</p>`;
+                    console.error(err);
                 }
-                taskList.innerHTML = "";
-                tasks.forEach(task => {
-                    const priorityColor = task.priority === "high" ? "bg-red-500" :
-                        task.priority === "mid" ? "bg-yellow-500" : "bg-green-500";
-                    const card = document.createElement("div");
-                    card.className = "bg-white shadow p-4 rounded-lg flex items-center";
-                    card.innerHTML = `
-          <div class="w-2 h-12 rounded-lg mr-3 ${priorityColor}"></div>
-          <div class="flex items-center space-x-3 flex-grow">
-            <input type="checkbox" class="taskCheckbox w-5 h-5 text-blue-600 rounded" data-id="${task._id}" ${task.completed ? "checked" : ""}>
-            <div>
-              <h2 class="font-semibold text-lg ${task.completed ? "line-through text-gray-400" : ""}">${task.title}</h2>
-              <p class="text-gray-500 text-sm">Due: ${formatDate(task.dueDate)}</p>
-              <p class="text-gray-500 text-sm">Timestamp: ${formatDate(task.createdAt)}</p>
-            </div>
-          </div>
-          <div class="flex space-x-2">
-            <button class="editBtn text-yellow-500 hover:text-yellow-600" title="Edit Task" data-id="${task._id}"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" /></svg></button>
-            <button class="deleteBtn text-red-500 hover:text-red-600" title="Delete Task" data-id="${task._id}"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg>
-</button>
-          </div>
-        `;
-                    taskList.appendChild(card);
-                });
-            } catch (err) {
-                taskList.innerHTML = `<p class="text-red-500">Error loading tasks</p>`;
-                console.error(err);
             }
-        }
+
 
         loadTasks();
     </script>

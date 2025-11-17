@@ -20,10 +20,18 @@ if (signupForm) {
 
             const data = await res.json();
             if (res.ok) {
+                // Save user info & token
+                localStorage.setItem("user", JSON.stringify(data.user));
+                localStorage.setItem("token", data.token);
+
                 message.classList.remove("text-red-500");
                 message.classList.add("text-green-600");
                 message.textContent = "✅ Account created! Redirecting...";
-                setTimeout(() => (window.location.href = "index.html"), 1500);
+
+                // Redirect to task.html with userId
+                setTimeout(() => {
+                    window.location.href = `task.html?userId=${data.user._id}`;
+                }, 1500);
             } else {
                 message.classList.add("text-red-500");
                 message.textContent = data.message || "⚠️ Error creating account.";
@@ -54,13 +62,20 @@ if (loginForm) {
 
             const data = await res.json();
             if (res.ok) {
+                // Save user info & token
                 localStorage.setItem("user", JSON.stringify(data.user));
                 localStorage.setItem("token", data.token);
 
                 message.classList.remove("text-red-500");
                 message.classList.add("text-green-600");
                 message.textContent = "✅ Login successful!";
-                setTimeout(() => (window.location.href = "profile.html"), 1000);
+
+                // console.log(data);
+
+                // Redirect to task.html with userId
+                setTimeout(() => {
+                    window.location.href = `task.html?userId=${data.user.id}`;
+                }, 1000);
             } else {
                 message.classList.add("text-red-500");
                 message.textContent = data.message || "⚠️ Invalid credentials.";
@@ -121,8 +136,7 @@ if (updateForm) {
                 },
                 body: JSON.stringify({ name, email, password }),
             });
-            //TODO: CHECK TOKEN AFTER LOGOUT
-            //express-session
+
             const data = await res.json();
             if (res.ok) {
                 updateMessage.classList.remove("text-red-500");
