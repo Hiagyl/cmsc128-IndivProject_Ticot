@@ -10,6 +10,10 @@
 
 <body class="bg-gray-100 min-h-screen flex flex-col items-center p-6">
     <h1 class="text-3xl font-bold mb-6">TODO LIST</h1>
+    <button id="profileBtn" class="ml-3 bg-gray-800 text-white px-4 py-2 rounded-lg shadow hover:bg-gray-900">
+        Profile
+    </button>
+
 
     <!-- Top bar -->
     <div class="flex justify-between items-center w-full max-w-2xl mb-6">
@@ -152,6 +156,22 @@
         let currentSort = null;
 
         let tasksCache = [];
+
+
+        // Profile button redirect
+            const profileBtn = document.getElementById("profileBtn");
+            if (profileBtn) {
+                profileBtn.addEventListener("click", () => {
+                    const user = JSON.parse(localStorage.getItem("user"));
+                    if (!user) {
+                        alert("Please log in first!");
+                        window.location.href = "index.html"; // redirect to login if not logged in
+                    } else {
+                        // redirect to profile page with user ID
+                        window.location.href = `profile.html?userId=${user._id || user.id}`;
+                    }
+                });
+            }
 
         // Modal controls
         openModalBtns.forEach(btn => btn.addEventListener("click", () => modal.classList.remove("hidden")));

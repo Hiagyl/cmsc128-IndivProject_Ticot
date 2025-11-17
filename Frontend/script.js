@@ -109,6 +109,21 @@ if (profilePage) {
     });
 }
 
+// ----- REDIRECT TO TASK PAGE -----
+
+const backToTasksBtn = document.getElementById("backToTasksBtn");
+if (backToTasksBtn) {
+    backToTasksBtn.addEventListener("click", () => {
+        const user = JSON.parse(localStorage.getItem("user"));
+        if (!user) {
+            alert("Please log in first!");
+            window.location.href = "index.html"; // redirect to login if not logged in
+        } else {
+            window.location.href = `task.html?userId=${user._id || user.id}`;
+        }
+    });
+}
+
 // ----- UPDATE PROFILE -----
 const updateForm = document.getElementById("updateForm");
 if (updateForm) {
