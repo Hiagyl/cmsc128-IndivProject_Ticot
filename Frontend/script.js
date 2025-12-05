@@ -1,4 +1,4 @@
-const API_BASE = "http://localhost:3000/api";
+const API_BASE = "https://cmsc128-indivproject-ticot-1.onrender.com/api";
 
 // ----- SIGNUP -----
 const signupForm = document.getElementById("signupForm");

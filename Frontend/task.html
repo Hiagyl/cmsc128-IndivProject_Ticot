@@ -212,7 +212,7 @@
         undoBtn.addEventListener("click", async () => {
                 if (!lastDeletedTaskId) return;
                 try {
-                    const res = await fetch(`http://localhost:3000/api/tasks/${lastDeletedTaskId}/restore`, {
+                    const res = await fetch(`https://cmsc128-indivproject-ticot-1.onrender.com/api/tasks/${lastDeletedTaskId}/restore`, {
                         method: "POST",
                         headers: {
                             "Authorization": `Bearer ${token}` // <-- include token
@@ -248,7 +248,7 @@
                 const id = checkbox.dataset.id;
                 const completed = checkbox.checked;
                 try {
-                    await fetch(`http://localhost:3000/api/tasks/${id}`, {
+                    await fetch(`https://cmsc128-indivproject-ticot-1.onrender.com/api/tasks/${id}`, {
                         method: "PUT",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ completed })
@@ -267,7 +267,7 @@
             if (deleteBtn) {
                 const id = deleteBtn.dataset.id;
                 try {
-                    const res = await fetch(`http://localhost:3000/api/tasks/${id}`, {
+                    const res = await fetch(`https://cmsc128-indivproject-ticot-1.onrender.com/api/tasks/${id}`, {
                         method: "DELETE",
                         headers: {
                             "Authorization": `Bearer ${token}` // <-- include token here
@@ -329,7 +329,7 @@
                     }
 
                     // Send POST request with token
-                    const res = await fetch("http://localhost:3000/api/tasks", {
+                    const res = await fetch("https://cmsc128-indivproject-ticot-1.onrender.com/api/tasks", {
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json",
@@ -366,7 +366,7 @@
                 priority: document.getElementById("editPriority").value
             };
             try {
-                const res = await fetch(`http://localhost:3000/api/tasks/${id}`, {
+                const res = await fetch(`https://cmsc128-indivproject-ticot-1.onrender.com/api/tasks/${id}`, {
                     method: "PUT",
                     headers: { "Content-Type": "application/json",
                         "Authorization": `Bearer ${token}`
@@ -387,7 +387,7 @@
                 taskList.innerHTML = "Loading tasks...";
                 try {
                     // Construct the URL with sorting if needed
-                    let url = "http://localhost:3000/api/tasks";
+                    let url = "https://cmsc128-indivproject-ticot-1.onrender.com/api/tasks";
                     if (currentSort) url += `?sort=${currentSort}`;
 
                     // Fetch tasks with Authorization header
