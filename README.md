@@ -44,11 +44,11 @@ Simply open the frontend URL in your browser and start managing tasks.
 
 ---
 
-##  **Sample API Endpoints**
-```https://cmsc128-indivproject-ticot-1.onrender.com/api/tasks```
----
-```https://cmsc128-indivproject-ticot-1.onrender.com/api/tasks/${id}```
----
-```https://cmsc128-indivproject-ticot-1.onrender.com/api/login```
+## **Sample API Endpoints**
+
+- Get all tasks: https://cmsc128-indivproject-ticot-1.onrender.com/api/tasks  
+- Get, update, or delete a specific task by ID: https://cmsc128-indivproject-ticot-1.onrender.com/api/tasks/${id}  
+- User login: https://cmsc128-indivproject-ticot-1.onrender.com/api/login
+
 
 
