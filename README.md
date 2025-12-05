@@ -31,7 +31,6 @@ const API_BASE = "https://cmsc128-indivproject-ticot-1.onrender.com/api";
 The app is **already deployed**, so no local setup is required to use it.
 
 - **Frontend URL (Vercel):** `cmsc128-indiv-project-ticot.vercel.app`
-- **Backend API URL (Render):** `https://cmsc128-indivproject-ticot-1.onrender.com/api`
 
 Simply open the frontend URL in your browser and start managing tasks.
 
@@ -47,7 +46,9 @@ Simply open the frontend URL in your browser and start managing tasks.
 
 ##  **Sample API Endpoints**
 ```https://cmsc128-indivproject-ticot-1.onrender.com/api/tasks```
+---
 ```https://cmsc128-indivproject-ticot-1.onrender.com/api/tasks/${id}```
+---
 ```https://cmsc128-indivproject-ticot-1.onrender.com/api/login```
 
 
