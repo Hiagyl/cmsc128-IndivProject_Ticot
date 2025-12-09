@@ -30,7 +30,7 @@ if (signupForm) {
 
                 // Redirect to task.html with userId
                 setTimeout(() => {
-                    window.location.href = "task.html";
+                    window.location.href = `task.html?userId=${data.user.id}`;
                 }, 1500);
             } else {
                 message.classList.add("text-red-500");
