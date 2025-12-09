@@ -134,6 +134,11 @@
     </div>
 
     <script>
+        window.history.pushState(null, "", window.location.href);
+            window.onpopstate = function () {
+                window.history.go(1); // prevent going back
+            };
+
         const user = JSON.parse(localStorage.getItem("user"));
         const token = localStorage.getItem("token");
 
