@@ -120,7 +120,7 @@ if (backToTasksBtn) {
             alert("Please log in first!");
             window.location.href = "index.html"; // redirect to login if not logged in
         } else {
-            window.location.href = `task.html?userId=${user._id || user.id}`;
+            window.location.replace(`task.html?userId=${user._id || user.id}`);
         }
     });
 }
