@@ -30,7 +30,7 @@ if (signupForm) {
 
                 // Redirect to task.html with userId
                 setTimeout(() => {
-                    window.location.href = `task.html?userId=${data.user.id || data.user._id}`;
+                    window.location.replace = `task.html?userId=${data.user.id || data.user._id}`;
 
                 }, 1500);
             } else {
@@ -75,7 +75,7 @@ if (loginForm) {
 
                 // Redirect to task.html with userId
                 setTimeout(() => {
-                    window.location.href = `task.html?userId=${data.user.id}`;
+                    window.location.replace = `task.html?userId=${data.user.id}`;
                 }, 1000);
             } else {
                 message.classList.add("text-red-500");
