@@ -30,7 +30,7 @@ if (signupForm) {
 
                 // Redirect to task.html with userId
                 setTimeout(() => {
-                    window.location.replace(`task.html?userId=${data.user.id || data.user._id}`);
+                    window.location.replace(`task.html?userId=${data.user.id}`);
 
                 }, 1500);
             } else {
