@@ -159,10 +159,10 @@
 
 
        
-            window.history.pushState(null, "", window.location.href);
+            window.history.replaceState(null, "", window.location.href);
 
             window.onpopstate = function () {
-                window.history.pushState(null, "", window.location.href);
+                window.history.replaceState(null, "", window.location.href);
             };
 
         // Profile button redirect
