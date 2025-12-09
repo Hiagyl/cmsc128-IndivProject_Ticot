@@ -105,7 +105,7 @@ if (profilePage) {
     document.addEventListener("click", (e) => {
         if (e.target.id === "logoutBtn") {
             localStorage.clear();
-            window.location.href = "index.html";
+            window.location.replace("index.html");
         }
     });
 }
