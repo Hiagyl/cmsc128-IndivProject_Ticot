@@ -1,13 +1,6 @@
 const API_BASE = "https://cmsc128-indivproject-ticot-1.onrender.com/api";
 
-const signupLink = document.getElementById("signupLink");
-signupLink.addEventListener("click", (e) => {
-    e.preventDefault(); // prevent default navigation
-    // Replace current page with signup.html
-    window.location.replace("signup.html");
-});
 // ----- SIGNUP -----
-
 const signupForm = document.getElementById("signupForm");
 if (signupForm) {
     signupForm.addEventListener("submit", async (e) => {
