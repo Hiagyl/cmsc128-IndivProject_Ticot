@@ -158,6 +158,10 @@
         let tasksCache = [];
 
 
+        window.history.pushState(null, "", window.location.href);
+            window.onpopstate = function () {
+                window.location.replace(`task.html ? userId = ${ user._id || user.id }`);
+            }
         // Profile button redirect
             const profileBtn = document.getElementById("profileBtn");
             if (profileBtn) {
