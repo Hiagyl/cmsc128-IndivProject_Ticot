@@ -249,7 +249,7 @@
                 const completed = checkbox.checked;
                 try {
                     await fetch(`https://cmsc128-indivproject-ticot-1.onrender.com/api/tasks/${id}`, {
-                        method: "PATCH",
+                        method: "PUT",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ completed })
                     });
