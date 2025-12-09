@@ -248,8 +248,8 @@
                 const id = checkbox.dataset.id;
                 const completed = checkbox.checked;
                 try {
-                    await fetch(`https://cmsc128-indivproject-ticot-1.onrender.com/api/tasks/${id}`, {
-                        method: "PUT",
+                    await fetch(`https://cmsc128-indivproject-ticot-1.onrender.com/api/tasks/${id}/complete`, {
+                        method: "PATCH",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ completed })
                     });
