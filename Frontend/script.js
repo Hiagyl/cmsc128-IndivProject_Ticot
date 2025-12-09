@@ -32,7 +32,7 @@ if (signupForm) {
                 setTimeout(() => {
                     window.location.replace(`task.html?userId=${data.user.id}`);
 
-                }, 1500);
+                }, 1000);
             } else {
                 message.classList.add("text-red-500");
                 message.textContent = data.message || "⚠️ Error creating account.";
