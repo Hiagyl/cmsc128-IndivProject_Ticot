@@ -82,17 +82,36 @@ app.post("/api/signup", async (req, res) => {
       return res.status(400).json({ message: "All fields are required." });
 
     const exists = await User.findOne({ email });
-    if (exists) return res.status(400).json({ message: "Email already registered." });
+    if (exists)
+      return res.status(400).json({ message: "Email already registered." });
 
+    // Create user
     const newUser = new User({ name, email, password });
     await newUser.save();
 
-    res.status(201).json({ message: "User registered successfully." });
+    // Create token
+    const token = jwt.sign(
+      { id: newUser._id, email: newUser.email },
+      process.env.JWT_SECRET || "secretkey",
+      { expiresIn: "1h" }
+    );
+
+    // Return same format as login
+    res.status(201).json({
+      message: "User registered successfully",
+      token,
+      user: {
+        id: newUser._id,
+        name: newUser.name,
+        email: newUser.email,
+      },
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Signup failed." });
   }
 });
+
 
 app.post("/api/login", async (req, res) => {
   try {
