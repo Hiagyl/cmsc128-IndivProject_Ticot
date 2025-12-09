@@ -23,7 +23,7 @@ if (signupForm) {
                 // Save user info & token
                 localStorage.setItem("user", JSON.stringify(data.user));
                 localStorage.setItem("token", data.token);
-                console.log(data.user.id);
+                // console.log(data.user.id);
                 message.classList.remove("text-red-500");
                 message.classList.add("text-green-600");
                 message.textContent = "✅ Account created! Redirecting...";
