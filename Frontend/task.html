@@ -250,14 +250,23 @@
                 try {
                     await fetch(`https://cmsc128-indivproject-ticot-1.onrender.com/api/tasks/${id}/complete`, {
                         method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Authorization": `Bearer ${localStorage.getItem("token")}`
+                        },
                         body: JSON.stringify({ completed })
                     });
+
                     const titleEl = checkbox.nextElementSibling.querySelector("h2");
-                    if (completed) titleEl.classList.add("line-through", "text-gray-400");
-                    else titleEl.classList.remove("line-through", "text-gray-400");
-                } catch (err) { console.error(err); }
+                    if (completed)
+                        titleEl.classList.add("line-through", "text-gray-400");
+                    else
+                        titleEl.classList.remove("line-through", "text-gray-400");
+                } catch (err) {
+                    console.error(err);
+                }
             }
+
 
             if (editBtn) {
                 const id = editBtn.dataset.id;

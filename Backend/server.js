@@ -269,19 +269,25 @@ app.post("/api/tasks/:id/restore", authenticateToken, async (req, res) => {
 // COMPLETE TASK
 app.patch("/api/tasks/:id/complete", authenticateToken, async (req, res) => {
   try {
-    const completed = await Task.findOneAndUpdate(
+    const completedTask = await Task.findOneAndUpdate(
       { _id: req.params.id, userId: req.user.id },
-      { completed: true, updatedAt: new Date() },
+      {
+        completed: req.body.completed,
+        updatedAt: new Date()
+      },
       { new: true }
     );
 
-    if (!completed) return res.status(404).json({ message: "Task not found." });
-    res.json({ message: "Task completed.", task: completed });
+    if (!completedTask)
+      return res.status(404).json({ message: "Task not found." });
+
+    res.json({ message: "Task updated.", task: completedTask });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Complete failed." });
+    res.status(500).json({ message: "Complete update failed." });
   }
 });
+
 
 // ---------------------- ERROR HANDLER ----------------------
 app.use((err, req, res, next) => {
