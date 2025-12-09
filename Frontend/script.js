@@ -23,14 +23,15 @@ if (signupForm) {
                 // Save user info & token
                 localStorage.setItem("user", JSON.stringify(data.user));
                 localStorage.setItem("token", data.token);
-                // console.log(data.user.id);
+
                 message.classList.remove("text-red-500");
                 message.classList.add("text-green-600");
                 message.textContent = "✅ Account created! Redirecting...";
 
                 // Redirect to task.html with userId
                 setTimeout(() => {
-                    window.location.href = `task.html?userId=${data.user.id}`;
+                    window.location.href = `task.html?userId=${data.user.id || data.user._id}`;
+
                 }, 1500);
             } else {
                 message.classList.add("text-red-500");
