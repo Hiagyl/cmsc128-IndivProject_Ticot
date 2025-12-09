@@ -29,8 +29,9 @@ if (signupForm) {
                 message.textContent = "✅ Account created! Redirecting...";
 
                 // Redirect to task.html with userId
-                window.location.replace(`task.html?userId=${data.user.id}`);
-
+                setTimeout(() => {
+                    window.location.replace(`task.html?userId=${data.user.id}`);
+                }, 1000);
                 
             } else {
                 message.classList.add("text-red-500");
