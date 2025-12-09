@@ -1,6 +1,11 @@
 const API_BASE = "https://cmsc128-indivproject-ticot-1.onrender.com/api";
 
 // ----- SIGNUP -----
+if (localStorage.getItem("user")) {
+    // User already logged in, redirect to task
+    window.location.replace("task.html?userId=" + JSON.parse(localStorage.getItem("user")).id);
+}
+
 const signupForm = document.getElementById("signupForm");
 if (signupForm) {
     signupForm.addEventListener("submit", async (e) => {
