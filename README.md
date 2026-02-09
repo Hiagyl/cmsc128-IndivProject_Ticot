@@ -17,7 +17,7 @@ This is a Task Management Web Application built with **Node.js + Express** for t
 
 ## **Frontend Technology**
 
-- **Frontend:** Any frontend framework (React, plain HTML/JS, etc.)
+- **Frontend:** Plain HTML/JS
 - **Hosting:** Vercel
 - **API Base URL:** 
 ```javascript
